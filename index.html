@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HanifTalk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Mengatur agar teks editor bisa di-format */
+        #editor {
+            min-height: 400px; /* Lebih lebar/tinggi untuk menulis nyaman */
+            outline: none;
+            overflow-y: auto;
+        }
+        #editor:empty:before {
+            content: attr(placeholder);
+            color: #9ca3af;
+        }
+        /* Style untuk hasil output agar format Bold/Italic muncul */
+        .content-output b, .content-output strong { font-weight: bold; }
+        .content-output i, .content-output em { font-style: italic; }
+        .content-output u { text-decoration: underline; }
+        
+        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .modal { transition: opacity 0.25s ease; z-index: 100; }
+        body.modal-active { overflow: hidden; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <nav class="bg-white shadow-sm p-4 sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-indigo-600 tracking-tight">Ceritaku</h1>
+            <div class="space-x-6">
+                <a href="index.html" class="text-indigo-600 font-bold border-b-2 border-indigo-600">Home</a>
+                <a href="profile.html" class="text-gray-500 hover:text-indigo-600 font-medium transition">Profile</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-6 max-w-6xl"> <section class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-12 w-full mx-auto">
+            <h2 id="formTitle" class="text-2xl font-bold mb-6 text-center">Buat Karya Baru</h2>
+            
+            <form id="storyForm" class="space-y-6">
+                <input type="hidden" id="editIndex">
+                
+                <div class="max-w-3xl mx-auto">
+                    <label class="block text-sm font-semibold text-gray-600 mb-1">Judul Cerita</label>
+                    <input type="text" id="title" required class="w-full p-4 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-400 outline-none text-lg font-medium" placeholder="Judul ceritamu...">
+                </div>
+
+                <div class="max-w-3xl mx-auto">
+                    <label class="block text-sm font-semibold text-gray-600 mb-1">Cover Cerita</label>
+                    <button type="button" onclick="toggleModal()" class="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-xl hover:bg-gray-50 transition">
+                        <span id="uploadStatus">📁 Pilih Gambar Cover</span>
+                    </button>
+                    <input type="hidden" id="imageData"> 
+                </div>
+
+                <div class="w-full border-t pt-6">
+                    <label class="block text-sm font-semibold text-gray-600 mb-3 text-center">Isi Cerita</label>
+                    
+                    <div class="flex flex-wrap justify-center gap-2 mb-4 sticky top-20 bg-white p-2 z-10 rounded-lg shadow-sm border">
+                        <button type="button" onclick="execCommand('bold')" class="p-2 w-10 h-10 bg-gray-100 rounded hover:bg-indigo-100 font-bold" title="Tebal">B</button>
+                        <button type="button" onclick="execCommand('italic')" class="p-2 w-10 h-10 bg-gray-100 rounded hover:bg-indigo-100 italic" title="Miring">I</button>
+                        <button type="button" onclick="execCommand('underline')" class="p-2 w-10 h-10 bg-gray-100 rounded hover:bg-indigo-100 underline" title="Garis Bawah">U</button>
+                        <div class="w-px h-10 bg-gray-300 mx-2"></div>
+                        <button type="button" onclick="execCommand('justifyLeft')" class="p-2 w-10 h-10 bg-gray-100 rounded hover:bg-indigo-100">⬅</button>
+                        <button type="button" onclick="execCommand('justifyCenter')" class="p-2 w-10 h-10 bg-gray-100 rounded hover:bg-indigo-100">↔</button>
+                        <button type="button" onclick="execCommand('insertUnorderedList')" class="p-2 w-10 h-10 bg-gray-100 rounded hover:bg-indigo-100">• List</button>
+                    </div>
+
+                    <div id="editor" contenteditable="true" placeholder="Mulai menulis ceritamu secara detail di sini..." class="w-full p-8 bg-white border rounded-2xl shadow-inner text-lg leading-relaxed text-gray-700 max-w-4xl mx-auto"></div>
+                </div>
+
+                <div class="max-w-3xl mx-auto pt-6">
+                    <button type="submit" id="submitBtn" class="w-full bg-indigo-600 text-white py-4 rounded-xl hover:bg-indigo-700 transition font-bold text-lg shadow-lg">Publish Cerita</button>
+                    <button type="button" id="cancelBtn" onclick="resetForm()" class="hidden w-full mt-4 text-gray-500 font-medium hover:underline">Batal Edit</button>
+                </div>
+            </form>
+        </section>
+
+        <h2 class="text-3xl font-bold mb-8 text-gray-800 text-center">Jelajahi Cerita</h2>
+        <div id="storyContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+    </main>
+
+    <div id="imageModal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
+        <div class="absolute w-full h-full bg-black opacity-40" onclick="toggleModal()"></div>
+        <div class="bg-white w-11/12 md:max-w-md mx-auto rounded-2xl shadow-2xl z-50 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <p class="text-lg font-bold">Upload Cover</p>
+                <button onclick="toggleModal()" class="text-gray-400 hover:text-black">✕</button>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+            <div id="previewBox" class="mt-4 hidden text-center">
+                <img id="imgPreview" src="" class="max-h-48 mx-auto rounded-lg shadow-md border">
+            </div>
+            <button onclick="saveImage()" class="w-full mt-6 bg-indigo-600 text-white py-2 rounded-lg font-bold">Simpan Gambar</button>
+        </div>
+    </div>
+
+    <script>
+        const storyForm = document.getElementById('storyForm');
+        const editor = document.getElementById('editor');
+        const storyContainer = document.getElementById('storyContainer');
+        const fileInput = document.getElementById('fileInput');
+        const imageData = document.getElementById('imageData');
+        const imgPreview = document.getElementById('imgPreview');
+        const previewBox = document.getElementById('previewBox');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        let stories = JSON.parse(localStorage.getItem('stories')) || [];
+
+        // Fungsi Rich Text Editor
+        function execCommand(command) {
+            document.execCommand(command, false, null);
+            editor.focus();
+        }
+
+        function toggleModal() {
+            document.getElementById('imageModal').classList.toggle('opacity-0');
+            document.getElementById('imageModal').classList.toggle('pointer-events-none');
+        }
+
+        fileInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imgPreview.src = e.target.result;
+                    previewBox.classList.remove('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function saveImage() {
+            if(imgPreview.src && imgPreview.src.includes('data:image')) {
+                imageData.value = imgPreview.src;
+                uploadStatus.innerText = "✅ Cover Berhasil Dipilih";
+                toggleModal();
+            } else { alert("Pilih file dulu!"); }
+        }
+
+        function renderStories() {
+            storyContainer.innerHTML = '';
+            stories.forEach((story, index) => {
+                storyContainer.innerHTML += `
+                    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300">
+                        <img src="${story.image}" class="w-full h-52 object-cover">
+                        <div class="p-6">
+                            <h3 class="font-extrabold text-xl text-gray-800 mb-2">${story.title}</h3>
+                            <div class="text-gray-500 text-sm line-clamp-3 mb-6 content-output">${story.content}</div>
+                            <div class="flex justify-between items-center border-t pt-4">
+                                <span class="text-xs font-bold text-indigo-400 uppercase">${story.date}</span>
+                                <div class="flex gap-2">
+                                    <button onclick="editStory(${index})" class="p-2 bg-gray-100 rounded-full hover:bg-indigo-600 hover:text-white transition">✏️</button>
+                                    <button onclick="deleteStory(${index})" class="p-2 bg-gray-100 rounded-full hover:bg-red-500 hover:text-white transition">🗑️</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        storyForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const editIndex = document.getElementById('editIndex').value;
+            const content = editor.innerHTML; // Simpan sebagai HTML
+            
+            if(!imageData.value) return alert("Upload cover dulu!");
+            if(editor.innerText.trim() === "") return alert("Isi cerita tidak boleh kosong!");
+
+            const newStory = {
+                title: document.getElementById('title').value,
+                content: content,
+                image: imageData.value,
+                date: new Date().toLocaleDateString('id-ID')
+            };
+
+            if (editIndex === "") {
+                stories.unshift(newStory);
+            } else {
+                stories[editIndex] = newStory;
+                resetForm();
+            }
+
+            localStorage.setItem('stories', JSON.stringify(stories));
+            storyForm.reset();
+            editor.innerHTML = "";
+            imageData.value = "";
+            uploadStatus.innerText = "📁 Pilih Gambar Cover";
+            renderStories();
+        });
+
+        window.editStory = (i) => {
+            const s = stories[i];
+            document.getElementById('title').value = s.title;
+            editor.innerHTML = s.content;
+            imageData.value = s.image;
+            document.getElementById('editIndex').value = i;
+            
+            document.getElementById('formTitle').innerText = "Edit Ceritamu";
+            document.getElementById('submitBtn').innerText = "Simpan Perubahan";
+            document.getElementById('cancelBtn').classList.remove('hidden');
+            uploadStatus.innerText = "✅ Cover Tersimpan";
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+
+        function resetForm() {
+            document.getElementById('editIndex').value = "";
+            document.getElementById('formTitle').innerText = "Buat Karya Baru";
+            document.getElementById('submitBtn').innerText = "Publish Cerita";
+            document.getElementById('cancelBtn').classList.add('hidden');
+            editor.innerHTML = "";
+            storyForm.reset();
+        }
+
+        window.deleteStory = (i) => {
+            if(confirm('Hapus cerita ini secara permanen?')) {
+                stories.splice(i, 1);
+                localStorage.setItem('stories', JSON.stringify(stories));
+                renderStories();
+            }
+        }
+
+        renderStories();
+    </script>
+</body>
+</html>
